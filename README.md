@@ -56,6 +56,8 @@ Then run setup:
 /codex:setup
 ```
 
+`/codex:setup` will tell you whether Codex is ready. If Codex is missing and npm is available, it can offer to install Codex for you.
+
 If Codex is not installed yet:
 
 ```bash
@@ -107,6 +109,8 @@ When run with `--background`, this fork keeps the review attached to a visible C
 
 Runs a steerable review that challenges the implementation approach, design choices, assumptions, and risk areas.
 
+It uses the same review target selection as `/codex:review`, including `--base <ref>` for branch review.
+
 Use it when you want Codex to pressure-test:
 
 - architecture
@@ -135,7 +139,7 @@ Use it when you want Codex to:
 
 - investigate a bug
 - implement a fix
-- continue previous Codex work
+- continue a previous Codex task
 - take a cheaper/faster pass with a smaller model
 - execute a task after Claude has planned or reviewed it
 
@@ -148,10 +152,19 @@ Examples:
 /codex:rescue --fresh investigate this from scratch
 /codex:rescue --model gpt-5.4-mini --effort medium investigate the flaky integration test
 /codex:rescue --model spark fix the issue quickly
+/codex:rescue --sandbox workspace-write fix with normal workspace boundaries
 /codex:rescue --background investigate the regression
 ```
 
 In this fork, `--background` backgrounds the Claude Code subagent, but Codex itself stays attached inside that visible subagent until completion.
+
+Write-capable rescue tasks default to `danger-full-access` so delegated implementation behaves closer to a full-access Codex app session. Review-only requests stay read-only. Pass `--sandbox read-only`, `--sandbox workspace-write`, or `--sandbox danger-full-access` to override the task sandbox for one run.
+
+**Notes:**
+
+- if you do not pass `--model` or `--effort`, Codex chooses its own defaults.
+- if you say `spark`, the plugin maps that to `gpt-5.3-codex-spark`
+- follow-up rescue requests can continue the latest Codex task in the repo
 
 ### `/codex:status`
 

@@ -32,9 +32,12 @@ Forwarding rules:
 - Leave model unset by default. Only add `--model` when the user explicitly asks for a specific model.
 - If the user asks for `spark`, map that to `--model gpt-5.3-codex-spark`.
 - If the user asks for a concrete model name such as `gpt-5.4-mini`, pass it through with `--model`.
+- If the user asks for a concrete sandbox mode, pass it through with `--sandbox`.
 - Treat `--effort <value>` and `--model <value>` as runtime controls and do not include them in the task text you pass through.
+- Treat `--sandbox <value>` as a runtime control and do not include it in the task text you pass through.
 - Treat `--background` and `--wait` as Claude-side execution controls and never include them in the `task` command.
 - Default to a write-capable Codex run by adding `--write` unless the user explicitly asks for read-only behavior or only wants review, diagnosis, or research without edits.
+- Default write-capable rescue runs use `danger-full-access` unless the user explicitly passes `--sandbox`.
 - Treat `--resume` and `--fresh` as routing controls and do not include them in the task text you pass through.
 - `--resume` means add `--resume-last`.
 - `--fresh` means do not add `--resume-last`.
