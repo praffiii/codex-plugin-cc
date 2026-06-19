@@ -784,7 +784,7 @@ test("task using the shared broker still completes when Codex spawns subagents",
   assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
 });
 
-test("task --background enqueues a detached worker and exposes per-job status", async () => {
+test("task --background stays attached and returns the completed task result", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   installFakeCodex(binDir, "slow-task");
@@ -799,38 +799,20 @@ test("task --background enqueues a detached worker and exposes per-job status", 
   });
 
   assert.equal(launched.status, 0, launched.stderr);
-  const launchPayload = JSON.parse(launched.stdout);
-  assert.equal(launchPayload.status, "queued");
-  assert.match(launchPayload.jobId, /^task-/);
+  const payload = JSON.parse(launched.stdout);
+  assert.equal(payload.status, 0);
+  assert.match(payload.rawOutput, /Handled the requested task/);
 
-  const waitedStatus = run(
-    "node",
-    [SCRIPT, "status", launchPayload.jobId, "--wait", "--timeout-ms", "15000", "--json"],
-    {
-      cwd: repo,
-      env: buildEnv(binDir)
-    }
-  );
-
-  assert.equal(waitedStatus.status, 0, waitedStatus.stderr);
-  const waitedPayload = JSON.parse(waitedStatus.stdout);
-  assert.equal(waitedPayload.job.id, launchPayload.jobId);
-  assert.equal(waitedPayload.job.status, "completed");
-
-  const resultPayload = await waitFor(() => {
-    const result = run("node", [SCRIPT, "result", launchPayload.jobId, "--json"], {
-      cwd: repo,
-      env: buildEnv(binDir)
-    });
-    if (result.status !== 0) {
-      return null;
-    }
-    return JSON.parse(result.stdout);
+  const status = run("node", [SCRIPT, "status", "--json"], {
+    cwd: repo,
+    env: buildEnv(binDir)
   });
 
-  assert.equal(resultPayload.job.id, launchPayload.jobId);
-  assert.equal(resultPayload.job.status, "completed");
-  assert.match(resultPayload.storedJob.rendered, /Handled the requested task/);
+  assert.equal(status.status, 0, status.stderr);
+  const statusPayload = JSON.parse(status.stdout);
+  assert.equal(statusPayload.running.length, 0);
+  assert.equal(statusPayload.latestFinished.status, "completed");
+  assert.match(statusPayload.latestFinished.id, /^task-/);
 });
 
 test("review rejects focus text because it is native-review only", () => {
@@ -1601,7 +1583,7 @@ test("cancel with a job id can still target an active job from another Claude se
   assert.equal(state.jobs[0].status, "cancelled");
 });
 
-test("cancel sends turn interrupt to the shared app-server before killing a brokered task", async () => {
+test("cancel sends turn interrupt to the shared app-server before killing a brokered task", async (t) => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   const fakeStatePath = path.join(binDir, "fake-codex-state.json");
@@ -1612,25 +1594,43 @@ test("cancel sends turn interrupt to the shared app-server before killing a brok
   run("git", ["commit", "-m", "init"], { cwd: repo });
 
   const env = buildEnv(binDir);
-  const launched = run("node", [SCRIPT, "task", "--background", "--json", "investigate the flaky worker timeout"], {
+  const launched = spawn("node", [SCRIPT, "task", "--background", "--json", "investigate the flaky worker timeout"], {
     cwd: repo,
-    env
+    env,
+    stdio: ["ignore", "pipe", "pipe"]
   });
 
-  assert.equal(launched.status, 0, launched.stderr);
-  const launchPayload = JSON.parse(launched.stdout);
-  const jobId = launchPayload.jobId;
-  assert.ok(jobId);
+  let launchedStdout = "";
+  let launchedStderr = "";
+  launched.stdout.on("data", (chunk) => {
+    launchedStdout += chunk;
+  });
+  launched.stderr.on("data", (chunk) => {
+    launchedStderr += chunk;
+  });
+
+  t.after(() => {
+    try {
+      launched.kill("SIGTERM");
+    } catch {
+      // Ignore if the attached task has already exited.
+    }
+  });
 
   const stateDir = resolveStateDir(repo);
   const runningJob = await waitFor(() => {
-    const state = JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8"));
-    const job = state.jobs.find((candidate) => candidate.id === jobId);
+    const stateFile = path.join(stateDir, "state.json");
+    if (!fs.existsSync(stateFile)) {
+      return null;
+    }
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    const job = state.jobs.find((candidate) => candidate.status === "running");
     if (job?.status === "running" && job.threadId && job.turnId) {
       return job;
     }
     return null;
   }, { timeoutMs: 15000 });
+  const jobId = runningJob.id;
 
   const cancelResult = run("node", [SCRIPT, "cancel", jobId, "--json"], {
     cwd: repo,
@@ -1663,6 +1663,12 @@ test("cancel sends turn interrupt to the shared app-server before killing a brok
     })
   });
   assert.equal(cleanup.status, 0, cleanup.stderr);
+
+  await new Promise((resolve) => launched.once("exit", resolve));
+  assert.equal(launchedStderr, "");
+  const launchedPayload = JSON.parse(launchedStdout);
+  assert.equal(launchedPayload.status, 1);
+  assert.equal(launchedPayload.threadId, runningJob.threadId);
 });
 
 test("session end fully cleans up jobs for the ending session", async (t) => {
