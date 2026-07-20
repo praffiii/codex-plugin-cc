@@ -6,7 +6,7 @@ This fork keeps the original plugin features, but changes background execution s
 
 ## What You Get
 
-- `/codex:review` for normal read-only Codex review
+- `/codex:review-codex` for normal read-only Codex review
 - `/codex:adversarial-review` for steerable challenge review
 - `/codex:rescue` for delegated bug fixing, implementation, and investigation
 - `/codex:status`, `/codex:result`, and `/codex:cancel` for tracked Codex jobs
@@ -72,7 +72,7 @@ If Codex is installed but not logged in:
 
 After install, you should see:
 
-- `/codex:review`
+- `/codex:review-codex`
 - `/codex:adversarial-review`
 - `/codex:rescue`
 - `/codex:status`
@@ -85,7 +85,7 @@ This fork also includes visible review forwarding agents for background review r
 
 ## Usage
 
-### `/codex:review`
+### `/codex:review-codex`
 
 Runs a normal read-only Codex review on your current work.
 
@@ -97,10 +97,10 @@ Use it when you want:
 Examples:
 
 ```bash
-/codex:review
-/codex:review --base main
-/codex:review --background
-/codex:review --wait
+/codex:review-codex
+/codex:review-codex --base main
+/codex:review-codex --background
+/codex:review-codex --wait
 ```
 
 When run with `--background`, this fork keeps the review attached to a visible Claude Code subagent while preserving tracked job status.
@@ -109,7 +109,7 @@ When run with `--background`, this fork keeps the review attached to a visible C
 
 Runs a steerable review that challenges the implementation approach, design choices, assumptions, and risk areas.
 
-It uses the same review target selection as `/codex:review`, including `--base <ref>` for branch review.
+It uses the same review target selection as `/codex:review-codex`, including `--base <ref>` for branch review.
 
 Use it when you want Codex to pressure-test:
 
@@ -223,7 +223,7 @@ When enabled, the review gate uses a Claude Code `Stop` hook to run a targeted C
 ### Review before shipping
 
 ```bash
-/codex:review --background
+/codex:review-codex --background
 /codex:status
 /codex:result
 ```
